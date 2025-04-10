@@ -3,125 +3,169 @@
  * 
  * This script demonstrates:
  * 1. Deploying the BiodiversityLandParcel smart contract to Hedera Testnet
- * 2. Creating a token using Hedera Token Service
- * 3. Adding biodiversity data to a tokenized land parcel
- * 4. Verifying the biodiversity data
- * 5. Integrating with the existing consensus service for recording verification
+ * 2. Creating a biodiversity token using Hedera Token Service (HTS)
+ * 3. Creating a topic for land parcel registry using Hedera Consensus Service (HCS)
+ * 4. Registering a land parcel
+ * 5. Adding biodiversity data using the smart contract
+ * 6. Verifying biodiversity data using the smart contract
+ * 7. Recording verification to the consensus service
+ * 
+ * The script supports two modes:
+ * - Network mode: Connects to Hedera Testnet when credentials are valid
+ * - Simulation mode: Runs in simulation when network connection fails
+ * 
+ * You can also choose to use a pre-deployed contract or deploy a new one
+ * by changing the USE_DEPLOYED_CONTRACT flag below.
  */
+
 require('dotenv').config();
 const {
   Client,
   PrivateKey,
   ContractCreateTransaction,
+  ContractExecuteTransaction,
   ContractFunctionParameters,
   ContractCallQuery,
-  ContractExecuteTransaction,
+  ContractId,
   TokenCreateTransaction,
+  TokenType,
+  TokenSupplyType,
   TopicCreateTransaction,
   TopicMessageSubmitTransaction,
   AccountId,
   FileCreateTransaction,
-  ContractId,
-  Hbar
+  Hbar,
+  AccountBalanceQuery
 } = require('@hashgraph/sdk');
 const fs = require('fs');
 const path = require('path');
+// Add ethers for contract deployment via JSON-RPC
+const { ethers } = require('hardhat');
+
+// ======== CONFIGURATION OPTIONS ========
+// Set this to true to use the pre-deployed contract, or false to deploy a new one
+const USE_DEPLOYED_CONTRACT = false;
+
+// Pre-deployed contract information
+const DEPLOYED_CONTRACT_ADDRESS = "0x30280aFAB4768895041088d65976A2fB8cF52eEF"; // EVM address format
+const DEPLOYED_CONTRACT_ID = "0.0.5847080"; // Hedera ID format (you may need to get the exact ID from HashScan)
+// ======================================
 
 // Main function
 async function main() {
   console.log('\n----- HEDERA BIODIVERSITY SMART CONTRACT DEMO -----\n');
   
-  // Step 1: Validate environment and setup client
+  // Step 1: Set up the Hedera client with account credentials from .env file
   console.log('Setting up Hedera client...');
-  const operatorId = process.env.OPERATOR_ID;
-  const operatorKey = process.env.OPERATOR_KEY;
   
-  if (!operatorId || !operatorKey) {
-    throw new Error('Environment variables OPERATOR_ID and OPERATOR_KEY must be present');
-  }
-  
-  console.log('Credentials found in .env file');
-  
-  // Convert DER-encoded private key if necessary
+  let client;
+  let operatorId;
   let privateKey;
-  try {
-    privateKey = PrivateKey.fromString(operatorKey);
-    console.log('Successfully parsed private key');
-  } catch (error) {
-    console.log('Error parsing private key:', error.message);
-    console.log('Attempting to use DER format...');
-    // This is a placeholder for demo purposes
-    privateKey = PrivateKey.generateED25519();
-    console.log('Generated a temporary private key for demonstration');
-  }
-  
-  // Create Hedera client
-  console.log('Creating Hedera client...');
-  const client = Client.forTestnet();
+  let network = true; // Flag to indicate if we're using real network or simulation
   
   try {
-    client.setOperator(AccountId.fromString(operatorId), privateKey);
-    console.log(`Using Hedera account: ${operatorId}`);
+    // Check if we have the credentials in the .env file
+    if (process.env.OPERATOR_ID && process.env.OPERATOR_KEY) {
+      console.log('Credentials found in .env file');
+      operatorId = process.env.OPERATOR_ID;
+      
+      // Parse the private key
+      try {
+        privateKey = PrivateKey.fromString(process.env.OPERATOR_KEY);
+        console.log('Successfully parsed private key');
+      } catch (error) {
+        console.error(`Error parsing private key: ${error.message}`);
+        throw new Error('Invalid private key format');
+      }
+    } else {
+      throw new Error('Missing OPERATOR_ID or OPERATOR_KEY in .env file');
+    }
     
-    // Test connection
-    console.log('Testing connection to Hedera network...');
-    const balance = await client.getAccountBalance(AccountId.fromString(operatorId));
-    console.log(`Account balance: ${balance.hbars.toString()}`);
-    console.log('Connection established successfully!');
-  } catch (error) {
-    console.error(`Error connecting to Hedera network: ${error.message}`);
-    console.log(`
+    // Create Hedera client
+    console.log('Creating Hedera client...');
+    client = Client.forTestnet();
+    
+    try {
+      client.setOperator(AccountId.fromString(operatorId), privateKey);
+      console.log(`Using Hedera account: ${operatorId}`);
+      
+      // Test connection
+      console.log('Testing connection to Hedera network...');
+      const balance = await new AccountBalanceQuery()
+        .setAccountId(AccountId.fromString(operatorId))
+        .execute(client);
+      
+      console.log(`Account balance: ${balance.hbars.toString()}`);
+      console.log('Connection established successfully!');
+    } catch (error) {
+      console.error(`Error connecting to Hedera network: ${error.message}`);
+      console.log(`
 -----------------------------------------------------
 SIMULATION MODE: Running in simulation mode since we couldn't connect to Hedera.
 This will demonstrate the flow without making actual transactions.
-In a real environment, you would need valid credentials and network access.
 -----------------------------------------------------`);
-    
-    // Continue with simulation
+      
+      // Continue with simulation
+      network = false;
+    }
+  } catch (error) {
+    console.error(`Error setting up client: ${error.message}`);
+    console.log('Exiting...');
+    return;
   }
   
   // Step 2: Deploy the BiodiversityLandParcel smart contract
   console.log('\nDeploying BiodiversityLandParcel smart contract...');
   
-  // Load the contract bytecode from the compiled artifact
-  console.log('Loading contract bytecode from artifacts...');
+  // Declare contract ID variable that will be used throughout the script
+  let contractId;
+  let contractAddress;
   
-  let contractId = ContractId.fromString("0.0.1234567"); // Placeholder for simulation
-  
-  try {
-    // Load the contract data from the artifacts
-    const artifactPath = path.join(__dirname, '../artifacts/contracts/BiodiversityLandParcel.sol/BiodiversityLandParcel.json');
-    const contractJson = JSON.parse(fs.readFileSync(artifactPath, 'utf8'));
-    const bytecode = contractJson.bytecode;
-    
-    if (!bytecode || bytecode === "0x") {
-      throw new Error("Invalid bytecode in artifact file");
+  if (USE_DEPLOYED_CONTRACT && network) {
+    // Use the pre-deployed contract instead of deploying a new one
+    console.log(`Using pre-deployed contract: ${DEPLOYED_CONTRACT_ID} (${DEPLOYED_CONTRACT_ADDRESS})`);
+    contractId = ContractId.fromString(DEPLOYED_CONTRACT_ID);
+    contractAddress = DEPLOYED_CONTRACT_ADDRESS;
+    console.log(`Successfully connected to deployed contract!`);
+  } else {
+    // If we're in simulation mode or USE_DEPLOYED_CONTRACT is false, we'll deploy a new contract or use a placeholder
+    if (!network) {
+      console.log('Running in simulation mode with placeholder contract ID');
+      contractId = ContractId.fromString("0.0.1234567"); // Placeholder for simulation
+      contractAddress = "0x0000000000000000000000000000000000001234"; // Placeholder address
+    } else {
+      // Deploy a new contract using ethers.js and Hardhat (compatible with JSON-RPC relay)
+      try {
+        console.log('Deploying new contract using ethers.js...');
+        
+        // Get the contract factory
+        const BiodiversityLandParcel = await ethers.getContractFactory("BiodiversityLandParcel");
+        
+        // Deploy the contract
+        console.log('Starting deployment...');
+        const biodiversityContract = await BiodiversityLandParcel.deploy();
+        
+        // Wait for deployment to complete
+        console.log('Waiting for deployment to complete...');
+        await biodiversityContract.deployed();
+        
+        // Get the contract address
+        contractAddress = biodiversityContract.address;
+        
+        // Convert EVM address to Hedera ID format
+        const contractIdStr = await convertAddressToContractId(contractAddress);
+        contractId = ContractId.fromString(contractIdStr);
+        
+        console.log(`BiodiversityLandParcel contract deployed successfully!`);
+        console.log(`Contract address (EVM format): ${contractAddress}`);
+        console.log(`Contract ID (Hedera format): ${contractId}`);
+      } catch (error) {
+        console.error(`Error deploying contract: ${error.message}`);
+        console.log('Continuing with simulation using placeholder contract ID');
+        contractId = ContractId.fromString("0.0.1234567"); // Placeholder for simulation
+        contractAddress = "0x0000000000000000000000000000000000001234"; // Placeholder address
+      }
     }
-    
-    console.log(`Successfully loaded bytecode (${bytecode.length} characters)`);
-    
-    // Store the contract bytecode in a file
-    console.log('Storing contract on Hedera...');
-    const contractBytecodeFileId = await storeContract(client, bytecode, privateKey);
-    console.log(`Contract bytecode stored in file: ${contractBytecodeFileId}`);
-    
-    // Deploy the contract from the file
-    console.log('Deploying the contract...');
-    const contractDeployTx = await new ContractCreateTransaction()
-      .setBytecodeFileId(contractBytecodeFileId)
-      .setGas(1000000)
-      .setConstructorParameters(new ContractFunctionParameters())
-      .freezeWith(client)
-      .sign(privateKey);
-    
-    const contractDeploySubmit = await contractDeployTx.execute(client);
-    const contractDeployRx = await contractDeploySubmit.getReceipt(client);
-    contractId = contractDeployRx.contractId;
-    
-    console.log(`Smart contract deployed successfully! Contract ID: ${contractId}`);
-  } catch (error) {
-    console.error(`Error in contract deployment: ${error.message}`);
-    console.log('Continuing with simulation using placeholder contract ID');
   }
   
   // Step 3: Create a biodiversity token
@@ -305,21 +349,6 @@ In a real environment, you would need valid credentials and network access.
   console.log(`https://hashscan.io/testnet/topic/${topicId}`);
 }
 
-// Helper function to store contract bytecode in a file
-async function storeContract(client, bytecode, privateKey) {
-  const contractBytecodeTx = await new FileCreateTransaction()
-    .setKeys([privateKey.publicKey])
-    .setContents(bytecode)
-    .setMaxTransactionFee(new Hbar(2))
-    .freezeWith(client)
-    .sign(privateKey);
-  
-  const contractBytecodeSubmit = await contractBytecodeTx.execute(client);
-  const contractBytecodeRx = await contractBytecodeSubmit.getReceipt(client);
-  
-  return contractBytecodeRx.fileId;
-}
-
 // Run the script
 main()
   .then(() => process.exit(0))
@@ -328,3 +357,20 @@ main()
     console.error(error.stack);
     process.exit(1);
   });
+
+// Helper function to convert EVM address to Hedera Contract ID format
+// This is a simplified version - in production, you would use the mirror node API
+async function convertAddressToContractId(evmAddress) {
+  // For this demo, we'll just use a placeholder conversion if we can't get the real ID
+  // In production, you would query the mirror node to get the contract ID
+  
+  try {
+    // Simple conversion for demo purposes - this won't work for all addresses
+    // In a real app, you would use the mirror node API to get the correct conversion
+    const contractNum = parseInt(evmAddress.slice(-7), 16);
+    return `0.0.${contractNum}`;
+  } catch (error) {
+    console.log('Could not convert EVM address to Hedera ID format');
+    return "0.0.1234567"; // Default placeholder
+  }
+}

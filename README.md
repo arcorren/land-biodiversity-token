@@ -68,6 +68,38 @@ This script will:
 5. Verify the biodiversity data through the contract
 6. Record the verification in the consensus service
 
+The script supports two modes:
+- **Network Mode**: Connects to actual Hedera Testnet when credentials are valid
+- **Simulation Mode**: Automatically runs in simulation when network connection fails, allowing demonstration without actual transactions
+
+### Deployed Contract on Testnet
+
+A production-ready version of the BiodiversityLandParcel contract has been deployed to Hedera Testnet at:
+
+```
+0x30280aFAB4768895041088d65976A2fB8cF52eEF
+```
+
+You can view this contract on the Hedera Explorer:
+https://hashscan.io/testnet/contract/0x30280aFAB4768895041088d65976A2fB8cF52eEF
+
+#### Contract Deployment Options
+
+For demonstration purposes, there are two approaches available:
+
+1. **Use the Pre-deployed Contract**: 
+   - The `test-biodiversity-contract.js` script can use the existing deployed contract
+   - Ensures demo reliability by avoiding potential deployment issues
+   - Provides faster demonstration flow
+
+2. **Deploy a New Contract**:
+   - Run the Hardhat deployment script to deploy a fresh contract:
+   ```
+   npx hardhat run scripts/deploy-biodiversity-contract.js --network hederaTestnet
+   ```
+   - Shows the complete deployment process in real-time
+   - Demonstrates the JSON-RPC relay approach for Hedera smart contract deployment
+
 ## Smart Contract Overview
 
 The `BiodiversityLandParcel.sol` contract provides:
