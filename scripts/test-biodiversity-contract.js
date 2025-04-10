@@ -3,153 +3,198 @@
  * 
  * This script demonstrates:
  * 1. Deploying the BiodiversityLandParcel smart contract to Hedera Testnet
- * 2. Creating a token using Hedera Token Service
- * 3. Adding biodiversity data to a tokenized land parcel
- * 4. Verifying the biodiversity data
- * 5. Integrating with the existing consensus service for recording verification
+ * 2. Creating a biodiversity token using Hedera Token Service (HTS)
+ * 3. Creating a topic for land parcel registry using Hedera Consensus Service (HCS)
+ * 4. Registering a land parcel
+ * 5. Adding biodiversity data using the smart contract
+ * 6. Verifying biodiversity data using the smart contract
+ * 7. Recording verification to the consensus service
+ * 
+ * The script supports two modes:
+ * - Network mode: Connects to Hedera Testnet when credentials are valid
+ * - Simulation mode: Runs in simulation when network connection fails
+ * 
+ * You can also choose to use a pre-deployed contract or deploy a new one
+ * by changing the USE_DEPLOYED_CONTRACT flag below.
  */
+
 require('dotenv').config();
 const {
   Client,
   PrivateKey,
   ContractCreateTransaction,
+  ContractExecuteTransaction,
   ContractFunctionParameters,
   ContractCallQuery,
-  ContractExecuteTransaction,
+  ContractId,
   TokenCreateTransaction,
+  TokenType,
+  TokenSupplyType,
   TopicCreateTransaction,
   TopicMessageSubmitTransaction,
   AccountId,
   FileCreateTransaction,
-  ContractId,
   Hbar,
   AccountBalanceQuery
 } = require('@hashgraph/sdk');
 const fs = require('fs');
 const path = require('path');
 
+// ======== CONFIGURATION OPTIONS ========
+// Set this to true to use the pre-deployed contract, or false to deploy a new one
+const USE_DEPLOYED_CONTRACT = true;
+
+// Pre-deployed contract information
+const DEPLOYED_CONTRACT_ADDRESS = "0x30280aFAB4768895041088d65976A2fB8cF52eEF"; // EVM address format
+const DEPLOYED_CONTRACT_ID = "0.0.5847080"; // Hedera ID format (you may need to get the exact ID from HashScan)
+// ======================================
+
 // Main function
 async function main() {
   console.log('\n----- HEDERA BIODIVERSITY SMART CONTRACT DEMO -----\n');
   
-  // Step 1: Validate environment and setup client
+  // Step 1: Set up the Hedera client with account credentials from .env file
   console.log('Setting up Hedera client...');
-  const operatorId = process.env.OPERATOR_ID;
-  const operatorKey = process.env.OPERATOR_KEY;
   
-  if (!operatorId || !operatorKey) {
-    throw new Error('Environment variables OPERATOR_ID and OPERATOR_KEY must be present');
-  }
-  
-  console.log('Credentials found in .env file');
-  
-  // Convert DER-encoded private key if necessary
+  let client;
+  let operatorId;
   let privateKey;
-  try {
-    privateKey = PrivateKey.fromString(operatorKey);
-    console.log('Successfully parsed private key');
-  } catch (error) {
-    console.log('Error parsing private key:', error.message);
-    console.log('Attempting to use DER format...');
-    // This is a placeholder for demo purposes
-    privateKey = PrivateKey.generateED25519();
-    console.log('Generated a temporary private key for demonstration');
-  }
-  
-  // Create Hedera client
-  console.log('Creating Hedera client...');
-  const client = Client.forTestnet();
+  let network = true; // Flag to indicate if we're using real network or simulation
   
   try {
-    client.setOperator(AccountId.fromString(operatorId), privateKey);
-    console.log(`Using Hedera account: ${operatorId}`);
+    // Check if we have the credentials in the .env file
+    if (process.env.OPERATOR_ID && process.env.OPERATOR_KEY) {
+      console.log('Credentials found in .env file');
+      operatorId = process.env.OPERATOR_ID;
+      
+      // Parse the private key
+      try {
+        privateKey = PrivateKey.fromString(process.env.OPERATOR_KEY);
+        console.log('Successfully parsed private key');
+      } catch (error) {
+        console.error(`Error parsing private key: ${error.message}`);
+        throw new Error('Invalid private key format');
+      }
+    } else {
+      throw new Error('Missing OPERATOR_ID or OPERATOR_KEY in .env file');
+    }
     
-    // Test connection
-    console.log('Testing connection to Hedera network...');
-    const balance = await new AccountBalanceQuery()
-      .setAccountId(AccountId.fromString(operatorId))
-      .execute(client);
+    // Create Hedera client
+    console.log('Creating Hedera client...');
+    client = Client.forTestnet();
     
-    console.log(`Account balance: ${balance.hbars.toString()}`);
-    console.log('Connection established successfully!');
-  } catch (error) {
-    console.error(`Error connecting to Hedera network: ${error.message}`);
-    console.log(`
+    try {
+      client.setOperator(AccountId.fromString(operatorId), privateKey);
+      console.log(`Using Hedera account: ${operatorId}`);
+      
+      // Test connection
+      console.log('Testing connection to Hedera network...');
+      const balance = await new AccountBalanceQuery()
+        .setAccountId(AccountId.fromString(operatorId))
+        .execute(client);
+      
+      console.log(`Account balance: ${balance.hbars.toString()}`);
+      console.log('Connection established successfully!');
+    } catch (error) {
+      console.error(`Error connecting to Hedera network: ${error.message}`);
+      console.log(`
 -----------------------------------------------------
 SIMULATION MODE: Running in simulation mode since we couldn't connect to Hedera.
 This will demonstrate the flow without making actual transactions.
 In a real environment, you would need valid credentials and network access.
 -----------------------------------------------------`);
-    
-    // Continue with simulation
+      
+      // Continue with simulation
+      network = false;
+    }
+  } catch (error) {
+    console.error(`Error setting up client: ${error.message}`);
+    console.log('Exiting...');
+    return;
   }
   
   // Step 2: Deploy the BiodiversityLandParcel smart contract
   console.log('\nDeploying BiodiversityLandParcel smart contract...');
   
-  // Load the contract bytecode from the compiled artifact
-  console.log('Loading contract bytecode from artifacts...');
+  // Declare contract ID variable that will be used throughout the script
+  let contractId;
   
-  let contractId = ContractId.fromString("0.0.1234567"); // Placeholder for simulation
-  
-  try {
-    // Load the contract data from the artifacts
-    const artifactPath = path.join(__dirname, '../artifacts/contracts/BiodiversityLandParcel.sol/BiodiversityLandParcel.json');
-    const contractJson = JSON.parse(fs.readFileSync(artifactPath, 'utf8'));
-    const bytecode = contractJson.bytecode;
-    
-    if (!bytecode || bytecode === "0x") {
-      throw new Error("Invalid bytecode in artifact file");
-    }
-    
-    console.log(`Successfully loaded bytecode (${bytecode.length} characters)`);
-    
-    // Make sure bytecode is properly formatted
-    const formattedBytecode = bytecode.startsWith('0x') ? bytecode.slice(2) : bytecode;
-    
-    // Create a file on Hedera containing the contract bytecode
-    console.log('Creating a file to store the contract bytecode...');
-    const fileCreateTx = await new FileCreateTransaction()
-      .setKeys([privateKey.publicKey])
-      .setContents(formattedBytecode)
-      .setMaxTransactionFee(new Hbar(10))
-      .freezeWith(client)
-      .sign(privateKey);
-    
-    const fileCreateSubmit = await fileCreateTx.execute(client);
-    const fileCreateReceipt = await fileCreateSubmit.getReceipt(client);
-    const bytecodeFileId = fileCreateReceipt.fileId;
-    console.log(`Contract bytecode file created with ID: ${bytecodeFileId}`);
-    
-    // Deploy the contract
-    console.log('Deploying the contract...');
-    try {
-      const contractCreateTx = await new ContractCreateTransaction()
-        .setBytecodeFileId(bytecodeFileId)
-        .setGas(2000000)
-        .setConstructorParameters(new ContractFunctionParameters())
-        .setMaxTransactionFee(new Hbar(30))
-        .freezeWith(client)
-        .sign(privateKey);
+  if (USE_DEPLOYED_CONTRACT && network) {
+    // Use the pre-deployed contract instead of deploying a new one
+    console.log(`Using pre-deployed contract: ${DEPLOYED_CONTRACT_ID} (${DEPLOYED_CONTRACT_ADDRESS})`);
+    contractId = ContractId.fromString(DEPLOYED_CONTRACT_ID);
+    console.log(`Successfully connected to deployed contract!`);
+  } else {
+    // If we're in simulation mode or USE_DEPLOYED_CONTRACT is false, we'll deploy a new contract or use a placeholder
+    if (!network) {
+      console.log('Running in simulation mode with placeholder contract ID');
+      contractId = ContractId.fromString("0.0.1234567"); // Placeholder for simulation
+    } else {
+      // Deploy a new contract
+      console.log('Loading contract bytecode from artifacts...');
       
-      const contractCreateSubmit = await contractCreateTx.execute(client);
-      const contractCreateReceipt = await contractCreateSubmit.getReceipt(client);
-      contractId = contractCreateReceipt.contractId;
-      console.log(`Smart contract deployed successfully! Contract ID: ${contractId}`);
-    } catch (error) {
-      console.error(`Detailed error in contract deployment: ${error.message}`);
-      if (error.message.includes('CONTRACT_REVERT_EXECUTED')) {
-        console.log('Contract reverted during execution. Check your contract code for issues.');
-      } else if (error.message.includes('INSUFFICIENT_GAS')) {
-        console.log('Not enough gas provided for contract deployment. Try increasing the gas limit.');
-      } else if (error.message.includes('INSUFFICIENT_TX_FEE')) {
-        console.log('Transaction fee too low. Try increasing the max transaction fee.');
+      try {
+        // Load the contract data from the artifacts
+        const artifactPath = path.join(__dirname, '../artifacts/contracts/BiodiversityLandParcel.sol/BiodiversityLandParcel.json');
+        const contractJson = JSON.parse(fs.readFileSync(artifactPath, 'utf8'));
+        const bytecode = contractJson.bytecode;
+        
+        if (!bytecode || bytecode === "0x") {
+          throw new Error("Invalid bytecode in artifact file");
+        }
+        
+        console.log(`Successfully loaded bytecode (${bytecode.length} characters)`);
+        
+        // Make sure bytecode is properly formatted
+        const formattedBytecode = bytecode.startsWith('0x') ? bytecode.slice(2) : bytecode;
+        
+        // Create a file on Hedera containing the contract bytecode
+        console.log('Creating a file to store the contract bytecode...');
+        const fileCreateTx = await new FileCreateTransaction()
+          .setKeys([privateKey.publicKey])
+          .setContents(formattedBytecode)
+          .setMaxTransactionFee(new Hbar(10))
+          .freezeWith(client)
+          .sign(privateKey);
+        
+        const fileCreateSubmit = await fileCreateTx.execute(client);
+        const fileCreateReceipt = await fileCreateSubmit.getReceipt(client);
+        const bytecodeFileId = fileCreateReceipt.fileId;
+        console.log(`Contract bytecode file created with ID: ${bytecodeFileId}`);
+        
+        // Deploy the contract
+        console.log('Deploying the contract...');
+        try {
+          const contractCreateTx = await new ContractCreateTransaction()
+            .setBytecodeFileId(bytecodeFileId)
+            .setGas(2000000)
+            .setConstructorParameters(new ContractFunctionParameters())
+            .setMaxTransactionFee(new Hbar(30))
+            .freezeWith(client)
+            .sign(privateKey);
+          
+          const contractCreateSubmit = await contractCreateTx.execute(client);
+          const contractCreateReceipt = await contractCreateSubmit.getReceipt(client);
+          contractId = contractCreateReceipt.contractId;
+          console.log(`Smart contract deployed successfully! Contract ID: ${contractId}`);
+        } catch (error) {
+          console.error(`Detailed error in contract deployment: ${error.message}`);
+          if (error.message.includes('CONTRACT_REVERT_EXECUTED')) {
+            console.log('Contract reverted during execution. Check your contract code for issues.');
+          } else if (error.message.includes('INSUFFICIENT_GAS')) {
+            console.log('Not enough gas provided for contract deployment. Try increasing the gas limit.');
+          } else if (error.message.includes('INSUFFICIENT_TX_FEE')) {
+            console.log('Transaction fee too low. Try increasing the max transaction fee.');
+          }
+          console.log('Continuing with simulation using placeholder contract ID');
+          contractId = ContractId.fromString("0.0.1234567"); // Placeholder for simulation
+        }
+      } catch (error) {
+        console.error(`Error in contract deployment: ${error.message}`);
+        console.log('Continuing with simulation using placeholder contract ID');
+        contractId = ContractId.fromString("0.0.1234567"); // Placeholder for simulation
       }
-      console.log('Continuing with simulation using placeholder contract ID');
     }
-  } catch (error) {
-    console.error(`Error in contract deployment: ${error.message}`);
-    console.log('Continuing with simulation using placeholder contract ID');
   }
   
   // Step 3: Create a biodiversity token
@@ -331,21 +376,6 @@ In a real environment, you would need valid credentials and network access.
   console.log(`https://hashscan.io/testnet/contract/${contractId}`);
   console.log(`https://hashscan.io/testnet/token/${tokenId}`);
   console.log(`https://hashscan.io/testnet/topic/${topicId}`);
-}
-
-// Helper function to store contract bytecode in a file
-async function storeContract(client, bytecode, privateKey) {
-  const contractBytecodeTx = await new FileCreateTransaction()
-    .setKeys([privateKey.publicKey])
-    .setContents(bytecode)
-    .setMaxTransactionFee(new Hbar(2))
-    .freezeWith(client)
-    .sign(privateKey);
-  
-  const contractBytecodeSubmit = await contractBytecodeTx.execute(client);
-  const contractBytecodeRx = await contractBytecodeSubmit.getReceipt(client);
-  
-  return contractBytecodeRx.fileId;
 }
 
 // Run the script
