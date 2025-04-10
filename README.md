@@ -1,6 +1,6 @@
 # Biodiversity Token System on Hedera
 
-A demonstration project showcasing how to create biodiversity tokens on the Hedera network, utilizing Hedera Token Service (HTS) and Hedera Consensus Service (HCS).
+A demonstration project showcasing how to create biodiversity tokens on the Hedera network, utilizing Hedera Token Service (HTS), Hedera Consensus Service (HCS), and Smart Contracts.
 
 ## Project Overview
 
@@ -10,6 +10,7 @@ This project demonstrates a system that:
 - Verifies land parcels and assesses biodiversity value
 - Mints tokens based on verified land area and biodiversity rating
 - Enables transparent tracking of conservation efforts
+- Uses smart contracts to verify and manage biodiversity attributes
 
 ## Technical Components
 
@@ -17,6 +18,7 @@ This demo leverages Hedera's powerful services:
 
 - **Hedera Token Service (HTS)**: Creates and manages the biodiversity token
 - **Hedera Consensus Service (HCS)**: Maintains an immutable registry of land parcels and verification records
+- **Hedera Smart Contract Service**: Implements verification logic and biodiversity data management
 - **Hedera SDK for JavaScript**: Direct integration with Hedera's network
 
 ## Setup Instructions
@@ -34,7 +36,9 @@ This demo leverages Hedera's powerful services:
 
 ## Running the Demo
 
-Execute the demo script which performs all operations in sequence:
+### Basic Token and Consensus Demo
+
+Execute the basic demo script which performs token and consensus operations:
 
 ```
 node scripts/hedera-biodiversity-demo.js
@@ -47,6 +51,33 @@ This will:
 4. Verify the land parcel and assign a biodiversity rating
 5. Mint biodiversity tokens based on the land area and rating
 6. Display the token information and useful links to view on Hedera Explorer
+
+### Smart Contract Demo
+
+To demonstrate the smart contract functionality:
+
+```
+node scripts/test-biodiversity-contract.js
+```
+
+This script will:
+1. Deploy the BiodiversityLandParcel smart contract to Hedera Testnet
+2. Create a biodiversity token using HTS
+3. Register a land parcel using HCS
+4. Add biodiversity data to the smart contract
+5. Verify the biodiversity data through the contract
+6. Record the verification in the consensus service
+
+## Smart Contract Overview
+
+The `BiodiversityLandParcel.sol` contract provides:
+
+- Storage of biodiversity data for tokenized land parcels
+- Verification mechanisms for biodiversity claims
+- Integration with Hedera Token Service for token operations
+- Transparent record of verifications and ecosystem classifications
+
+This contract complements the existing token creation and consensus functionality by adding a verification layer and detailed biodiversity tracking.
 
 ## Sample Output
 
@@ -89,6 +120,7 @@ Token Information:
 - **Tokenization**: Conservation efforts are represented as tradable digital assets
 - **Efficiency**: Leverages Hedera's fast and cost-effective consensus
 - **Environmental Impact**: Creates economic incentives for biodiversity protection
+- **Smart Contract Verification**: Adds programmatic verification of biodiversity claims
 
 ## Resources
 
@@ -96,3 +128,4 @@ Token Information:
 - [Hedera SDK for JavaScript](https://github.com/hashgraph/hedera-sdk-js)
 - [Hedera Token Service](https://hedera.com/token-service)
 - [Hedera Consensus Service](https://hedera.com/consensus-service)
+- [Hedera Smart Contract Service](https://docs.hedera.com/hedera/core-concepts/smart-contracts)
