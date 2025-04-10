@@ -68,6 +68,10 @@ This script will:
 5. Verify the biodiversity data through the contract
 6. Record the verification in the consensus service
 
+The script supports two modes:
+- **Network Mode**: Connects to actual Hedera Testnet when credentials are valid
+- **Simulation Mode**: Automatically runs in simulation when network connection fails, allowing demonstration without actual transactions
+
 ## Smart Contract Overview
 
 The `BiodiversityLandParcel.sol` contract provides:

@@ -22,7 +22,8 @@ const {
   AccountId,
   FileCreateTransaction,
   ContractId,
-  Hbar
+  Hbar,
+  AccountBalanceQuery
 } = require('@hashgraph/sdk');
 const fs = require('fs');
 const path = require('path');
@@ -65,7 +66,10 @@ async function main() {
     
     // Test connection
     console.log('Testing connection to Hedera network...');
-    const balance = await client.getAccountBalance(AccountId.fromString(operatorId));
+    const balance = await new AccountBalanceQuery()
+      .setAccountId(AccountId.fromString(operatorId))
+      .execute(client);
+    
     console.log(`Account balance: ${balance.hbars.toString()}`);
     console.log('Connection established successfully!');
   } catch (error) {
@@ -100,25 +104,49 @@ In a real environment, you would need valid credentials and network access.
     
     console.log(`Successfully loaded bytecode (${bytecode.length} characters)`);
     
-    // Store the contract bytecode in a file
-    console.log('Storing contract on Hedera...');
-    const contractBytecodeFileId = await storeContract(client, bytecode, privateKey);
-    console.log(`Contract bytecode stored in file: ${contractBytecodeFileId}`);
+    // Make sure bytecode is properly formatted
+    const formattedBytecode = bytecode.startsWith('0x') ? bytecode.slice(2) : bytecode;
     
-    // Deploy the contract from the file
-    console.log('Deploying the contract...');
-    const contractDeployTx = await new ContractCreateTransaction()
-      .setBytecodeFileId(contractBytecodeFileId)
-      .setGas(1000000)
-      .setConstructorParameters(new ContractFunctionParameters())
+    // Create a file on Hedera containing the contract bytecode
+    console.log('Creating a file to store the contract bytecode...');
+    const fileCreateTx = await new FileCreateTransaction()
+      .setKeys([privateKey.publicKey])
+      .setContents(formattedBytecode)
+      .setMaxTransactionFee(new Hbar(10))
       .freezeWith(client)
       .sign(privateKey);
     
-    const contractDeploySubmit = await contractDeployTx.execute(client);
-    const contractDeployRx = await contractDeploySubmit.getReceipt(client);
-    contractId = contractDeployRx.contractId;
+    const fileCreateSubmit = await fileCreateTx.execute(client);
+    const fileCreateReceipt = await fileCreateSubmit.getReceipt(client);
+    const bytecodeFileId = fileCreateReceipt.fileId;
+    console.log(`Contract bytecode file created with ID: ${bytecodeFileId}`);
     
-    console.log(`Smart contract deployed successfully! Contract ID: ${contractId}`);
+    // Deploy the contract
+    console.log('Deploying the contract...');
+    try {
+      const contractCreateTx = await new ContractCreateTransaction()
+        .setBytecodeFileId(bytecodeFileId)
+        .setGas(2000000)
+        .setConstructorParameters(new ContractFunctionParameters())
+        .setMaxTransactionFee(new Hbar(30))
+        .freezeWith(client)
+        .sign(privateKey);
+      
+      const contractCreateSubmit = await contractCreateTx.execute(client);
+      const contractCreateReceipt = await contractCreateSubmit.getReceipt(client);
+      contractId = contractCreateReceipt.contractId;
+      console.log(`Smart contract deployed successfully! Contract ID: ${contractId}`);
+    } catch (error) {
+      console.error(`Detailed error in contract deployment: ${error.message}`);
+      if (error.message.includes('CONTRACT_REVERT_EXECUTED')) {
+        console.log('Contract reverted during execution. Check your contract code for issues.');
+      } else if (error.message.includes('INSUFFICIENT_GAS')) {
+        console.log('Not enough gas provided for contract deployment. Try increasing the gas limit.');
+      } else if (error.message.includes('INSUFFICIENT_TX_FEE')) {
+        console.log('Transaction fee too low. Try increasing the max transaction fee.');
+      }
+      console.log('Continuing with simulation using placeholder contract ID');
+    }
   } catch (error) {
     console.error(`Error in contract deployment: ${error.message}`);
     console.log('Continuing with simulation using placeholder contract ID');
