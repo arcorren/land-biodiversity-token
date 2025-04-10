@@ -1,0 +1,112 @@
+[
+  {
+    "name": "Ancient Redwood Grove",
+    "boundaries": [
+      {"latitude": 40.3488, "longitude": -124.0046},
+      {"latitude": 40.3522, "longitude": -124.0046},
+      {"latitude": 40.3522, "longitude": -123.9978},
+      {"latitude": 40.3488, "longitude": -123.9978}
+    ],
+    "areaInAcres": 120,
+    "ecosystemType": "Old Growth Forest",
+    "conservationStatus": "Protected Conservation Easement",
+    "protectionStartDate": 1009843200,
+    "notableSpecies": [
+      "Northern Spotted Owl",
+      "Marbled Murrelet",
+      "Coastal Giant Salamander",
+      "Old-growth Douglas Fir",
+      "Coastal Redwood"
+    ],
+    "biodiversityRating": 5,
+    "verificationNotes": "Well-preserved old growth redwood ecosystem with multiple endangered species present. Intact forest canopy with minimal anthropogenic disturbance."
+  },
+  {
+    "name": "Highland Meadow Wetland",
+    "boundaries": [
+      {"latitude": 39.0742, "longitude": -107.9234},
+      {"latitude": 39.0798, "longitude": -107.9234},
+      {"latitude": 39.0798, "longitude": -107.9156},
+      {"latitude": 39.0742, "longitude": -107.9156}
+    ],
+    "areaInAcres": 85,
+    "ecosystemType": "Alpine Wetland",
+    "conservationStatus": "Land Trust Preserve",
+    "protectionStartDate": 1041379200,
+    "notableSpecies": [
+      "Boreal Toad",
+      "Sandhill Crane",
+      "Yellow-billed Cuckoo",
+      "Mountain Sedge",
+      "Alpine Paintbrush"
+    ],
+    "biodiversityRating": 4,
+    "verificationNotes": "High-elevation wetland complex with diverse habitat zones. Intact hydrological systems and minimal invasive species presence."
+  },
+  {
+    "name": "Coastal Sage Sanctuary",
+    "boundaries": [
+      {"latitude": 33.5586, "longitude": -117.7842},
+      {"latitude": 33.5624, "longitude": -117.7842},
+      {"latitude": 33.5624, "longitude": -117.7768},
+      {"latitude": 33.5586, "longitude": -117.7768}
+    ],
+    "areaInAcres": 67,
+    "ecosystemType": "Coastal Sage Scrub",
+    "conservationStatus": "Protected Area",
+    "protectionStartDate": 1072915200,
+    "notableSpecies": [
+      "California Gnatcatcher",
+      "Coastal Cactus Wren",
+      "Orange-throated Whiptail",
+      "Coast Horned Lizard",
+      "California Sagebrush"
+    ],
+    "biodiversityRating": 3,
+    "verificationNotes": "Recovering coastal sage scrub ecosystem with several endemic species. Some habitat fragmentation but overall good condition."
+  },
+  {
+    "name": "Prairie Pothole Reserve",
+    "boundaries": [
+      {"latitude": 47.1289, "longitude": -100.7892},
+      {"latitude": 47.1332, "longitude": -100.7892},
+      {"latitude": 47.1332, "longitude": -100.7812},
+      {"latitude": 47.1289, "longitude": -100.7812}
+    ],
+    "areaInAcres": 210,
+    "ecosystemType": "Prairie Pothole",
+    "conservationStatus": "Conservation Reserve",
+    "protectionStartDate": 946684800,
+    "notableSpecies": [
+      "Piping Plover",
+      "Northern Pintail",
+      "Western Meadowlark",
+      "Prairie Cordgrass",
+      "Purple Prairie Clover"
+    ],
+    "biodiversityRating": 4,
+    "verificationNotes": "Critical migratory bird habitat with intact grassland and seasonal wetlands. Excellent example of native prairie pothole ecosystem."
+  },
+  {
+    "name": "Everglades Cypress Dome",
+    "boundaries": [
+      {"latitude": 25.8459, "longitude": -80.6231},
+      {"latitude": 25.8499, "longitude": -80.6231},
+      {"latitude": 25.8499, "longitude": -80.6181},
+      {"latitude": 25.8459, "longitude": -80.6181}
+    ],
+    "areaInAcres": 95,
+    "ecosystemType": "Cypress Wetland",
+    "conservationStatus": "National Park",
+    "protectionStartDate": 915148800,
+    "notableSpecies": [
+      "American Alligator",
+      "Wood Stork",
+      "Roseate Spoonbill",
+      "Bald Cypress",
+      "Ghost Orchid"
+    ],
+    "biodiversityRating": 5,
+    "verificationNotes": "Pristine cypress dome with exceptional biodiversity and water quality. Part of larger Everglades ecosystem with continuous habitat connections."
+  }
+]
