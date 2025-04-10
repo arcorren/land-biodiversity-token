@@ -1,14 +1,19 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity >=0.8.0 <0.9.0;
 
-import "./HederaTokenService.sol";
 import "./HederaResponseCodes.sol";
 
 /**
  * @title BiodiversityLandParcel
  * @dev A contract to verify and manage biodiversity attributes for tokenized land parcels
  */
-contract BiodiversityLandParcel is HederaTokenService {
+contract BiodiversityLandParcel {
+    // Define the interface for the Hedera Token Service
+    IHederaTokenService private tokenService;
+    
+    // Address of the precompiled contract for HTS
+    address constant private PRECOMPILED_TOKEN_SERVICE = address(0x167);
+    
     // Struct to store biodiversity metadata for each land parcel
     struct BiodiversityData {
         uint256 biodiversityScore;     // A score representing biodiversity value (0-100)
@@ -24,6 +29,11 @@ contract BiodiversityLandParcel is HederaTokenService {
     // Events
     event BiodiversityDataAdded(address tokenId, uint256 biodiversityScore, string ecosystemType);
     event BiodiversityDataVerified(address tokenId, address verifier, uint256 timestamp);
+    
+    constructor() {
+        // Initialize the token service 
+        tokenService = IHederaTokenService(PRECOMPILED_TOKEN_SERVICE);
+    }
     
     /**
      * @dev Add biodiversity data for a token
@@ -81,12 +91,14 @@ contract BiodiversityLandParcel is HederaTokenService {
      * @param accountId Account to associate with the token
      * @param tokenId Token to be associated
      */
-    function associateToken(address accountId, address tokenId) external {
-        int response = HederaTokenService.associateToken(accountId, tokenId);
+    function associateToken(address accountId, address tokenId) external returns (int) {
+        int response = tokenService.associateToken(accountId, tokenId);
         
         if (response != HederaResponseCodes.SUCCESS) {
             revert("Token association failed");
         }
+        
+        return response;
     }
     
     /**
@@ -101,11 +113,19 @@ contract BiodiversityLandParcel is HederaTokenService {
         address fromId,
         address toId,
         int64 amount
-    ) external {
-        int response = HederaTokenService.transferToken(tokenId, fromId, toId, amount);
+    ) external returns (int) {
+        int response = tokenService.transferToken(tokenId, fromId, toId, amount);
         
         if (response != HederaResponseCodes.SUCCESS) {
             revert("Token transfer failed");
         }
+        
+        return response;
     }
+}
+
+// Interface for interacting with the Hedera Token Service precompile
+interface IHederaTokenService {
+    function associateToken(address account, address token) external returns (int responseCode);
+    function transferToken(address token, address from, address to, int64 amount) external returns (int responseCode);
 }
